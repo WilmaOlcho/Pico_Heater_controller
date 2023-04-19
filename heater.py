@@ -19,6 +19,7 @@ class Heater:
         self._low = 1
         self._timer = ticks_us()
         self._grid_frequency = 50
+        self._counter = 0
 
     def set_grid_frequency(self, frequency:int) -> None:
         self._grid_frequency = frequency
@@ -45,15 +46,54 @@ class Heater:
 
     def update(self) -> None:
         if self.active:
-            if (ticks_diff(self._timer,ticks_us()) > (1/self._grid_frequency) * 500000):
+            if (abs(ticks_diff(self._timer,ticks_us())) > (1/self._grid_frequency) * 1000000):
                 self._timer = ticks_us()
                 if self._counter < self._high:
                     self.pin.value(1)
-                    self._counter += 1
                 elif self._counter < self._high + self._low:
                     self.pin.value(0)
-                    self._counter += 1
-                else:
+                self._counter += 1
+                if self._counter >= self._high + self._low:
                     self._counter = 0
         else:
             self.pin.value(0)
+
+class Heaters:
+    heaters = []
+    _grid_frequency:int
+    def __init__(self, grid_frequency:int = 50):
+        self._grid_frequency = grid_frequency
+
+    def add_heater(self, heater:Heater) -> None:
+        self.heaters.append(heater)
+        heater.set_grid_frequency(self._grid_frequency)
+
+    def set_grid_frequency(self, frequency:int) -> None:
+        self._grid_frequency = frequency
+        for heater in self.heaters:
+            heater.set_grid_frequency(self._grid_frequency)
+
+    def set_power(self, heater:int, power:int) -> None:
+        self.heaters[heater].set_power(power)
+
+    def on(self, heater:int) -> None:
+        self.heaters[heater].on()
+
+    def off(self, heater:int) -> None:
+        self.heaters[heater].off()
+
+    def set_power_all(self, power:int) -> None:
+        for heater in self.heaters:
+            heater.set_power(power)
+
+    def on_all(self) -> None:
+        for heater in self.heaters:
+            heater.on() 
+
+    def off_all(self) -> None:
+        for heater in self.heaters:
+            heater.off()
+
+    def update(self) -> None:
+        for heater in self.heaters:
+            heater.update()

@@ -70,6 +70,7 @@ class ModbusRTU(Modbus):
 
 
 class Serial(CommonModbusFunctions):
+    tx_led:Pin = None
     def __init__(self,
                  uart_id: int = 1,
                  baudrate: int = 9600,
@@ -96,8 +97,8 @@ class Serial(CommonModbusFunctions):
         :param      ctrl_pin:    The control pin
         :type       ctrl_pin:    int
         """
-        self._uart = UART(uart_id,
-                          baudrate=baudrate,
+        self._uart = UART(uart_id)
+        self._uart.init(baudrate,
                           bits=data_bits,
                           parity=parity,
                           stop=stop_bits,
@@ -255,6 +256,8 @@ class Serial(CommonModbusFunctions):
 
         if self._ctrlPin:
             self._ctrlPin(1)
+            if self.tx_led:
+                self.tx_led(1)
             time.sleep_us(1000)     # wait until the control pin really changed
             send_start_time = time.ticks_us()
 
@@ -265,6 +268,8 @@ class Serial(CommonModbusFunctions):
             while time.ticks_us() <= send_start_time + total_frame_time_us:
                 machine.idle()
             self._ctrlPin(0)
+            if self.tx_led:
+                self.tx_led(0)
 
     def _send_receive(self,
                       modbus_pdu: bytes,
@@ -407,7 +412,6 @@ class Serial(CommonModbusFunctions):
         :rtype:     Union[Request, None]
         """
         req = self._uart_read_frame(timeout=timeout)
-
         if len(req) < 8:
             return None
 
