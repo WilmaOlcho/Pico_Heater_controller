@@ -1,10 +1,17 @@
 from heater import Heater, Heaters
-from machine import Pin, ADC
+from machine import Pin, ADC, RTC
+from time import localtime, gmtime
 
 from umodbus.serial import ModbusRTU as ModbusSlave
 from registers import register_definitions, callback
 
 from _thread import start_new_thread, allocate_lock
+
+import logging
+
+log = logging.getLogger()
+LOG = "log.txt"
+logging.basicConfig(level=logging.NOTSET,filename=LOG)
 
 lock = allocate_lock()
 
@@ -36,22 +43,16 @@ slave.setup_registers(register_definitions)
 
 def run():
     while True:
-        lock.acquire()
-        heaters.update()
-        lock.release()
+        with lock:
+            heaters.update()
 
 def set_power(heater, power):
-    lock.acquire()
-    heaters.set_power(heater,power)
-    lock.release()
+    with lock:
+        heaters.set_power(heater,power)
 
 def set_active(heater,active):
-    lock.acquire()
-    if active:
-        heaters.on(heater)
-    else:
-        heaters.off(heater)
-    lock.release()
+    with lock:
+        heaters.on(heater) if active else heaters.off(heater)
 
 def set_H1_power(reg_type, address, val):
     set_power(0,val[0])

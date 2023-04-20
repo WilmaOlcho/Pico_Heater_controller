@@ -233,11 +233,24 @@ class Modbus(object):
                     self.set_coil(address=address, value=val)
             elif reg_type == 'HREGS':
                 valid_register = True
-                val = list(functions.to_short(byte_array=request.data,
-                                              signed=False))
+                val = list(functions.to_short(byte_array=request.data, signed=False))
+                value_range_min = self._register_dict[reg_type][address].get('value_range_min', None)
+                value_range_max = self._register_dict[reg_type][address].get('value_range_max', None)
+                values_specified = self._register_dict[reg_type][address].get('values_specified', None)
+                for single_value in val:
+                    if value_range_min is not None and value_range_max is not None:
+                        if value_range_min > single_value or value_range_max < single_value:
+                            valid_register = False
+                            request.send_exception(Const.ILLEGAL_DATA_VALUE)
+                            break
+                    if values_specified is not None:
+                        if single_value not in values_specified:
+                            valid_register = False
+                            request.send_exception(Const.ILLEGAL_DATA_VALUE)
+                            break
 
-                if request.function in [Const.WRITE_SINGLE_REGISTER,
-                                        Const.WRITE_MULTIPLE_REGISTERS]:
+                if (request.function in [Const.WRITE_SINGLE_REGISTER,
+                                        Const.WRITE_MULTIPLE_REGISTERS]) and valid_register:
                     self.set_hreg(address=address, value=val)
             else:
                 # nothing except holding registers or coils can be set
@@ -339,7 +352,10 @@ class Modbus(object):
                  address: int,
                  value: Union[int, List[int]] = 0,
                  on_set_cb: Callable[[str, int, List[int]], None] = None,
-                 on_get_cb: Callable[[str, int, List[int]], None] = None) -> None:
+                 on_get_cb: Callable[[str, int, List[int]], None] = None,
+                 value_range_min:int=None,
+                 value_range_max:int=None,
+                 values_specified:int=None) -> None:
         """
         Add a holding register to the modbus register dictionary.
 
@@ -356,7 +372,10 @@ class Modbus(object):
                               address=address,
                               value=value,
                               on_set_cb=on_set_cb,
-                              on_get_cb=on_get_cb)
+                              on_get_cb=on_get_cb,
+                              value_range_min=value_range_min,
+                              value_range_max=value_range_max,
+                              values_specified=values_specified)
 
     def remove_hreg(self, address: int) -> Union[None, int, List[int]]:
         """
@@ -557,7 +576,10 @@ class Modbus(object):
                                              None] = None,
                          on_get_cb: Callable[[str, int, Union[List[bool],
                                                               List[int]]],
-                                             None] = None) -> None:
+                                             None] = None,
+                        value_range_min:int = None,
+                        value_range_max:int = None,
+                        values_specified:List[int]=None) -> None:
         """
         Set the register value in the dictionary of registers.
 
@@ -592,13 +614,19 @@ class Modbus(object):
                                              address=this_addr,
                                              value=val,
                                              on_set_cb=on_set_cb,
-                                             on_get_cb=on_get_cb)
+                                             on_get_cb=on_get_cb,
+                                             value_range_min=value_range_min,
+                                             value_range_max=value_range_max,
+                                             values_specified=values_specified)
         else:
             self._set_single_reg_in_dict(reg_type=reg_type,
                                          address=address,
                                          value=value,
                                          on_set_cb=on_set_cb,
-                                         on_get_cb=on_get_cb)
+                                         on_get_cb=on_get_cb,
+                                         value_range_min=value_range_min,
+                                         value_range_max=value_range_max,
+                                         values_specified=values_specified)
 
     def _set_single_reg_in_dict(self,
                                 reg_type: str,
@@ -611,7 +639,10 @@ class Modbus(object):
                                 on_get_cb: Callable[
                                     [str, int, Union[List[bool], List[int]]],
                                     None
-                                ] = None) -> None:
+                                ] = None,
+                                value_range_min:int = None,
+                                value_range_max:int = None,
+                                values_specified:List[int]=None) -> None:
         """
         Set a register value in the dictionary of registers.
 
@@ -645,13 +676,25 @@ class Modbus(object):
 
             on_get_cb = self._register_dict[reg_type][address].get('on_get_cb',
                                                                    on_get_cb)
+            
+            value_range_min = self._register_dict[reg_type][address].get('value_range_min',value_range_min)
+            value_range_max = self._register_dict[reg_type][address].get('value_range_max',value_range_max)
+            values_specified = self._register_dict[reg_type][address].get('values_specified',values_specified)
 
         if callable(on_set_cb):
             data['on_set_cb'] = on_set_cb
 
         if callable(on_get_cb):
             data['on_get_cb'] = on_get_cb
+        
+        if value_range_min is not None:
+            data['value_range_min'] = value_range_min
+        
+        if value_range_max is not None:
+            data['value_range_max'] = value_range_max
 
+        if values_specified is not None:
+            data['values_specified'] = values_specified
         self._register_dict[reg_type][address] = data
 
     def _remove_reg_from_dict(self,
@@ -848,6 +891,9 @@ class Modbus(object):
 
                         on_set_cb = val.get('on_set_cb', None)
                         on_get_cb = val.get('on_get_cb', None)
+                        value_range_min = val.get('value_range_min', None)
+                        value_range_max = val.get('value_range_max', None)
+                        values_specified = val.get('values_specified', None)
 
                         if reg_type == 'COILS':
                             self.add_coil(address=address,
@@ -858,7 +904,11 @@ class Modbus(object):
                             self.add_hreg(address=address,
                                           value=value,
                                           on_set_cb=on_set_cb,
-                                          on_get_cb=on_get_cb)
+                                          on_get_cb=on_get_cb,
+                                          value_range_min=value_range_min,
+                                          value_range_max=value_range_max,
+                                          values_specified=values_specified)
+                            
                         elif reg_type == 'ISTS':
                             self.add_ist(address=address,
                                          value=value,
