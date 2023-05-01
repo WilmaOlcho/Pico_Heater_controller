@@ -6,6 +6,7 @@ class RegisterCallbacks:
     reg_set_grid_frequency:callable=None
     reg_set_status:callable=None
     reg_set_stop_processing:callable=None
+    reg_Log_File_Read:callable=None
 
     def Set_Heater1_power(self, reg_type:str, address:int, val:int):
         if self.reg_set_heater1_power:
@@ -34,6 +35,10 @@ class RegisterCallbacks:
     def Set_Stop_processing(self, reg_type:str, address:int, val:int):
         if self.reg_set_stop_processing:
             self.reg_set_stop_processing(reg_type, address, val)
+
+    def Log_File_Read(self, reg_type:str, address:int, val:int):
+        if self.reg_Log_File_Read:
+            self.reg_Log_File_Read(reg_type, address, val)
 
 callback = RegisterCallbacks()
 
@@ -91,20 +96,11 @@ register_definitions = {
             "len": 1,
             "val": 0
         },
-        "Logfile_size": {
+        "Logfile_read": {
             "register": 10,
-            "len": 1,
-            "val": 0
-        },
-        "Logfile_readline": {
-            "register": 11,
-            "len": 40,
-            "val": 0
-        },
-        "Logfile_readline_index": {
-            "register": 12,
-            "len": 1,
-            "val": 0
+            "len": 100,
+            "val": 0,
+            "on_get_cb": callback.Log_File_Read
         },
         "Stop_processing": {
             "register": 2137,

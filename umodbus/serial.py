@@ -55,7 +55,8 @@ class ModbusRTU(Modbus):
                  parity: Optional[int] = None,
                  pins: List[Union[int, Pin], Union[int, Pin]] = None,
                  ctrl_pin: int = None,
-                 uart_id: int = 1):
+                 uart_id: int = 1,
+                 logger=None):
         super().__init__(
             # set itf to Serial object, addr_list to [addr]
             Serial(uart_id=uart_id,
@@ -64,9 +65,10 @@ class ModbusRTU(Modbus):
                    stop_bits=stop_bits,
                    parity=parity,
                    pins=pins,
-                   ctrl_pin=ctrl_pin),
-            [addr]
-        )
+                   ctrl_pin=ctrl_pin,
+                   logger=logger),
+                [addr], logger=logger   
+            )
 
 
 class Serial(CommonModbusFunctions):
@@ -78,7 +80,8 @@ class Serial(CommonModbusFunctions):
                  stop_bits: int = 1,
                  parity=None,
                  pins: List[Union[int, Pin], Union[int, Pin]] = None,
-                 ctrl_pin: int = None):
+                 ctrl_pin: int = None,
+                 logger=None):
         """
         Setup Serial/RTU Modbus
 
@@ -97,6 +100,7 @@ class Serial(CommonModbusFunctions):
         :param      ctrl_pin:    The control pin
         :type       ctrl_pin:    int
         """
+        self._logger = logger
         self._uart = UART(uart_id)
         self._uart.init(baudrate,
                           bits=data_bits,
@@ -395,6 +399,8 @@ class Serial(CommonModbusFunctions):
         modbus_pdu = functions.exception_response(
             function_code=function_code,
             exception_code=exception_code)
+        if self._logger is not None:
+            self._logger.debug('send exception response: {}'.format(Const.Exception_names[exception_code]))
         self._send(modbus_pdu=modbus_pdu, slave_addr=slave_addr)
 
     def get_request(self,
@@ -426,7 +432,7 @@ class Serial(CommonModbusFunctions):
             return None
 
         try:
-            request = Request(interface=self, data=req_no_crc)
+            request = Request(interface=self, data=req_no_crc, logger=self._logger)
         except ModbusException as e:
             self.send_exception_response(
                 slave_addr=req[0],

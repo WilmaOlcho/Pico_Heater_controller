@@ -23,6 +23,7 @@ from .common import Request
 # typing not natively supported on MicroPython
 from .typing import Callable, dict_keys, List, Optional, Union
 
+import logging
 
 class Modbus(object):
     """
@@ -34,9 +35,10 @@ class Modbus(object):
     :type       addr_list:  List[int]
     """
     lastrequest = Request
-    def __init__(self, itf, addr_list: List[int]) -> None:
+    def __init__(self, itf, addr_list: List[int], logger=None) -> None:
         self._itf = itf
         self._addr_list = addr_list
+        self._logger = logger
 
         # modbus register types with their default value
         self._available_register_types = ['COILS', 'HREGS', 'IREGS', 'ISTS']
@@ -105,6 +107,8 @@ class Modbus(object):
             request.send_exception(Const.ILLEGAL_FUNCTION)
 
         if reg_type:
+            if self._logger is not None:
+                self._logger.debug('Modbus request: type:"{}" reg_type:"{}" reg_addr:"{}"'.format(req_type, reg_type,request.register_addr))
             if req_type == 'READ':
                 self._process_read_access(request=request, reg_type=reg_type)
             elif req_type == 'WRITE':

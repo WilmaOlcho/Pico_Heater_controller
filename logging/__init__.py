@@ -1,6 +1,7 @@
 import utime
 import sys
 import uio
+from machine import ADC
 
 CRITICAL = 50
 ERROR    = 40
@@ -38,38 +39,38 @@ class Logger:
     def isEnabledFor(self, level):
         return level >= (self.level or _level)
 
-    def log(self, level, msg, *args):
+    def log(self, level, msg, *args, **kwargs):
         if level >= (self.level or _level):
             record = LogRecord(
-                self.name, level, None, None, msg, args, None, None, None
+                self.name, level, None, None, msg, args, None, None, None, kwargs.pop("cputemp", None)
             )
 
             if self.handlers:
                 for hdlr in self.handlers:
                     hdlr.emit(record)
 
-    def debug(self, msg, *args):
-        self.log(DEBUG, msg, *args)
+    def debug(self, msg, *args, **kwargs):
+        self.log(DEBUG, msg, *args, **kwargs)
 
-    def info(self, msg, *args):
-        self.log(INFO, msg, *args)
+    def info(self, msg, *args, **kwargs):
+        self.log(INFO, msg, *args, **kwargs)
 
-    def warning(self, msg, *args):
-        self.log(WARNING, msg, *args)
+    def warning(self, msg, *args, **kwargs):
+        self.log(WARNING, msg, *args, **kwargs)
 
-    def error(self, msg, *args):
-        self.log(ERROR, msg, *args)
+    def error(self, msg, *args, **kwargs):
+        self.log(ERROR, msg, *args, **kwargs)
 
-    def critical(self, msg, *args):
-        self.log(CRITICAL, msg, *args)
+    def critical(self, msg, *args, **kwargs):
+        self.log(CRITICAL, msg, *args, **kwargs)
 
-    def exc(self, e, msg, *args):
+    def exc(self, e, msg, *args, **kwargs):
         buf = uio.StringIO()
         sys.print_exception(e, buf)
-        self.log(ERROR, msg + "\n" + buf.getvalue(), *args)
+        self.log(ERROR, msg + "\n" + buf.getvalue(), *args, **kwargs)
 
-    def exception(self, msg, *args):
-        self.exc(sys.exc_info()[1], msg, *args)
+    def exception(self, msg, *args, **kwargs):
+        self.exc(sys.exc_info()[1], msg, *args, **kwargs)
 
     def addHandler(self, hdlr):
         if self.handlers is None:
@@ -176,6 +177,12 @@ class Formatter:
             return "%(asctime)" in self.fmt
         elif self.style == "{":
             return "{asctime" in self.fmt
+        
+    def usesCpuTemp(self):
+        if self.style == "%":
+            return "%(cputemp)" in self.fmt
+        elif self.style == "{":
+            return "{cputemp" in self.fmt
 
     def format(self, record):
         # The message attribute of the record is computed using msg % args.
@@ -185,6 +192,9 @@ class Formatter:
         # format the event time.
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
+
+        if self.usesCpuTemp():
+            record.cputemp = self.formatCpuTemp(record)
 
         # If there is exception information, it is formatted using formatException()
         # and appended to the message. The formatted exception information is cached
@@ -208,6 +218,13 @@ class Formatter:
         assert datefmt is None  # datefmt is not supported
         ct = utime.localtime(record.created)
         return "{0}-{1}-{2} {3}:{4}:{5}".format(*ct)
+    
+    def formatCpuTemp(self, record):
+        chip_temp = ADC(4)
+        conversion_factor = 3.3 / (65535)
+        reading = chip_temp.read_u16() * conversion_factor 
+        cputemp = 27.0 - (reading - 0.706)/0.001721
+        return cputemp
 
     def formatException(self, exc_info):
         raise NotImplementedError()
@@ -221,7 +238,7 @@ root = getLogger()
 
 class LogRecord:
     def __init__(
-        self, name, level, pathname, lineno, msg, args, exc_info, func=None, sinfo=None
+        self, name, level, pathname, lineno, msg, args, exc_info, func=None, sinfo=None, cputemp=0
     ):
         ct = utime.time()
         self.created = ct
@@ -236,3 +253,9 @@ class LogRecord:
         self.exc_info = exc_info
         self.func = func
         self.sinfo = sinfo
+        self.cputemp = cputemp
+
+class printstream:
+    @classmethod
+    def write(cls, s):
+        print(s, end='')

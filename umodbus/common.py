@@ -15,13 +15,16 @@ import struct
 from . import const as Const
 from . import functions
 
+import logging
+
 # typing not natively supported on MicroPython
 from .typing import List, Optional, Tuple, Union
 
 
 class Request(object):
     """Deconstruct request data received via TCP or Serial"""
-    def __init__(self, interface, data: bytearray) -> None:
+    def __init__(self, interface, data: bytearray, logger=None) -> None:
+        self.logger = logger
         self._itf = interface
         self.unit_addr = data[0]
         self.function, self.register_addr = struct.unpack_from('>BH', data, 1)
@@ -96,6 +99,8 @@ class Request(object):
         :param      exception_code:  The exception code
         :type       exception_code:  int
         """
+        if self.logger is not None:
+            self.logger.debug("Send Exception code: {} function:{}".format(exception_code, hex(self.function)))
         self._itf.send_exception_response(self.unit_addr,
                                           self.function,
                                           exception_code)
@@ -103,9 +108,12 @@ class Request(object):
 
 class ModbusException(Exception):
     """Exception for signaling modbus errors"""
-    def __init__(self, function_code: int, exception_code: int) -> None:
+    def __init__(self, function_code: int, exception_code: int, logger=None) -> None:
         self.function_code = function_code
         self.exception_code = exception_code
+        self.logger = logger
+        if self.logger is not None:
+            self.logger.debug("Exception code: {} function:{}".format(Const.Exception_names[exception_code], hex(function_code)))
 
 
 class CommonModbusFunctions(object):
