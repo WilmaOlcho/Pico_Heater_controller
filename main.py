@@ -10,8 +10,9 @@ from _thread import start_new_thread, allocate_lock
 from ledstrip import IC74HC595, LedStrip
 
 sr = IC74HC595(11,12,13,10)
-leds = LedStrip(8, sr, 1)
+leds = LedStrip(8, sr, direction=-1, leds_as_indicator=8)
 leds.percent_to_led(100,leds.green)
+leds = LedStrip(8, sr, direction=-1, leds_as_indicator=6)
 
 import logging
 global log
@@ -83,14 +84,24 @@ class PeriodicTimer:
 
 timerjump = 0
 def leds_timer_cb():
+    global timerjump
     with lock:
         powers = [heaters.get_power(i) for i in range(4)]
+    
+    ledmark1 = timerjump%4 & 0x1
+    ledmark2 = timerjump%4 & 0x2
+    for i, mark in enumerate([ledmark1, ledmark2]):
+        if mark:
+            leds.leds[i].green()
+        else:
+            leds.leds[i].off()
     leds.percent_to_led(powers[timerjump%4],leds.red)
+    timerjump+=1
 
 leds_timer = PeriodicTimer(leds_timer_cb)
 
 def run():
-    leds_timer.start(2)
+    leds_timer.start(2.0)
     log.info("Starting Heaters thread")
     while True:
         with lock:

@@ -33,31 +33,30 @@ class LedStrip:
             self.state = [0,0]
     red = 1
     green = 2
-    def __init__(self, length:int, sr: IC74HC595, direction: int = 1):
+    def __init__(self, length:int, sr: IC74HC595, direction: int = 1, leds_as_indicator=6):
         self.sr = sr
         self.leds = []
         self.direction = direction
-        for i in range(length):
+        self.leds_as_indicator = leds_as_indicator
+        for _ in range(length):
             self.leds.append(self.led())
 
     def update(self):
         data = []
         for i in range(len(self.leds)):
-            data += self.leds[i].state
+            data += self.leds[i if self.direction==1 else len(self.leds)-i-1].state
         self.sr.write(data)
 
     def percent_to_led(self, prcnt, color):
-        active_leds = round(prcnt * len(self.leds) / 100)
-        if self.direction == -1:
-            led_range = reversed(range(len(self.leds)))
-        else:
-            led_range = range(len(self.leds))
-        for i in led_range:
-            if i < active_leds:
+        active_leds = round(prcnt * self.leds_as_indicator / 100)
+        for i, led in enumerate(self.leds):
+            if i < len(self.leds) - self.leds_as_indicator:
+                continue
+            if i < active_leds + len(self.leds) - self.leds_as_indicator:
                 if color == self.red:
-                    self.leds[i].red()
+                    led.red()
                 elif color == self.green:
-                    self.leds[i].green()
+                    led.green()
             else:
                 self.leds[i].off()
         self.update()
