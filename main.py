@@ -1,11 +1,17 @@
 from heater import Heater, Heaters
-from machine import Pin, ADC, RTC
-from time import localtime, gmtime
+from machine import Pin, ADC, Timer
+from time import sleep_ms, ticks_us, ticks_diff
 
 from umodbus.serial import ModbusRTU as ModbusSlave
 from registers import register_definitions, callback
 
 from _thread import start_new_thread, allocate_lock
+
+from ledstrip import IC74HC595, LedStrip
+
+sr = IC74HC595(11,12,13,10)
+leds = LedStrip(8, sr, 1)
+leds.percent_to_led(100,leds.green)
 
 import logging
 global log
@@ -52,11 +58,44 @@ slave = ModbusSlave(**slave_config)
 slave._itf.tx_led = tx_led
 slave.setup_registers(register_definitions)
 
+class PeriodicTimer:
+    _timer:int
+    active:bool
+    period:float
+    def __init__(self, callback):
+        self.active = False
+        self.callback = callback
+
+    def start(self, period:float) -> None:
+        self._timer = ticks_us()
+        self.active = True
+        self.period = period
+
+    def stop(self) -> None:
+        self.active = False
+
+    def update(self) -> None:
+        if self.active:
+            if (abs(ticks_diff(self._timer,ticks_us())) > self.period * 1000000):
+                self._timer = ticks_us()
+                self.callback()
+
+
+timerjump = 0
+def leds_timer_cb():
+    with lock:
+        powers = [heaters.get_power(i) for i in range(4)]
+    leds.percent_to_led(powers[timerjump%4],leds.red)
+
+leds_timer = PeriodicTimer(leds_timer_cb)
+
 def run():
+    leds_timer.start(2)
     log.info("Starting Heaters thread")
     while True:
         with lock:
             heaters.update()
+        leds_timer.update()
 
 def set_power(heater, power):
     with lock:

@@ -76,6 +76,9 @@ class Heaters:
     def set_power(self, heater:int, power:int) -> None:
         self.heaters[heater].set_power(power)
 
+    def get_power(self, heater:int) -> int:
+        return self.heaters[heater].power
+
     def on(self, heater:int) -> None:
         self.heaters[heater].on()
 
