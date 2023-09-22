@@ -96,12 +96,12 @@ register_definitions = {
             "len": 1,
             "val": 0
         },
-        "Logfile_read": {
-            "register": 10,
-            "len": 100,
-            "val": 0,
-            "on_get_cb": callback.Log_File_Read
-        },
+        #"Logfile_read": {
+        #    "register": 10,
+        #    "len": 100,
+        #    "val": 0,
+        #    "on_get_cb": callback.Log_File_Read
+        #},
         "Stop_processing": {
             "register": 2137,
             "len": 1,
